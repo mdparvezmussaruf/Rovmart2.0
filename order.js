@@ -264,90 +264,204 @@ function validateOrderForm() {
 async function submitOrder(event) {
   event.preventDefault();
 
-  if (!validateOrderForm()) return;
+  if (!validateOrderForm()) {
+    return;
+  }
+
   if (getCartQuantity() === 0) {
     showFormMessage("Your cart is empty.", true);
     return;
   }
 
-  if (!CONFIG.GOOGLE_SCRIPT_URL || CONFIG.GOOGLE_SCRIPT_URL.includes("PASTE_YOUR")) {
-    showFormMessage("Google Sheets is not connected yet. Add your Apps Script Web App URL in config.js.", true);
+  if (
+    !CONFIG.GOOGLE_SCRIPT_URL ||
+    CONFIG.GOOGLE_SCRIPT_URL.includes("PASTE_YOUR")
+  ) {
+    showFormMessage(
+      "Google Sheets is not connected yet. Add your Apps Script Web App URL in config.js.",
+      true
+    );
     return;
   }
 
-  const button = document.getElementById("submitOrderBtn");
-  const form = document.getElementById("orderForm");
-  const items = getDetailedCart();
+  const button =
+    document.getElementById("submitOrderBtn");
+
+  const form =
+    document.getElementById("orderForm");
+
+  const items =
+    getDetailedCart();
 
   const deliveryArea =
-  getSelectedDeliveryArea();
+    getSelectedDeliveryArea();
 
 
-const orderData = {
+  /*
+    Make sure a delivery area was actually selected.
+  */
+  if (!deliveryArea) {
 
-  customerName:
-    document
-      .getElementById("customerName")
-      .value
-      .trim(),
+    showFormMessage(
+      "Please select your delivery area.",
+      true
+    );
 
-  phone:
-    document
-      .getElementById("phone")
-      .value
-      .trim(),
+    return;
+  }
 
-  address:
-    document
-      .getElementById("address")
-      .value
-      .trim(),
 
-  deliveryArea:
+  /*
+    Prepare order data.
+    Do NOT send the delivery charge.
+    Code.gs calculates it securely.
+  */
+  const orderData = {
 
-    deliveryArea,
+    customerName:
+      document
+        .getElementById("customerName")
+        .value
+        .trim(),
 
-  note:
-    document
-      .getElementById("note")
-      .value
-      .trim(),
+    phone:
+      document
+        .getElementById("phone")
+        .value
+        .trim(),
 
-  items:
-    items.map(item => ({
+    address:
+      document
+        .getElementById("address")
+        .value
+        .trim(),
 
-      id: item.id,
+    deliveryArea:
+      deliveryArea,
 
-      quantity: item.quantity
+    note:
+      document
+        .getElementById("note")
+        .value
+        .trim(),
 
-    }))
+    items:
+      items.map(item => ({
+        id: item.id,
+        quantity: item.quantity
+      }))
 
-};
+  };
+
+
+  console.log(
+    "ORDER DATA SENT:",
+    orderData
+  );
+
 
   button.disabled = true;
   button.textContent = "Submitting...";
+
   showFormMessage("");
 
+
   try {
-    const response = await fetch(CONFIG.GOOGLE_SCRIPT_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify(orderData)
-    });
 
-    const result = await response.json();
+    const response =
+      await fetch(
+        CONFIG.GOOGLE_SCRIPT_URL,
+        {
+          method: "POST",
 
-    if (!result.success) {
-      throw new Error(result.message || "Unable to submit order.");
+          headers: {
+            "Content-Type":
+              "text/plain;charset=utf-8"
+          },
+
+          body:
+            JSON.stringify(orderData)
+        }
+      );
+
+
+    /*
+      Read as text first.
+      This makes debugging much easier than response.json().
+    */
+    const responseText =
+      await response.text();
+
+
+    console.log(
+      "GOOGLE APPS SCRIPT RESPONSE:",
+      responseText
+    );
+
+
+    let result;
+
+    try {
+
+      result =
+        JSON.parse(responseText);
+
+    } catch (jsonError) {
+
+      console.error(
+        "INVALID JSON RESPONSE:",
+        jsonError
+      );
+
+      throw new Error(
+        "Google Apps Script returned an invalid response."
+      );
+
     }
 
+
+    if (!result.success) {
+
+      throw new Error(
+        result.message ||
+        "Unable to submit order."
+      );
+
+    }
+
+
+    /*
+      Order successfully saved.
+    */
     clearCart();
+
     form.reset();
-    showOrderSuccess(result.orderId);
+
+    showOrderSuccess(
+      result.orderId
+    );
+
+
   } catch (error) {
-    showFormMessage("Something went wrong while placing your order. Please try again.", true);
+
+    console.error(
+      "ORDER SUBMISSION ERROR:",
+      error
+    );
+
+
+    showFormMessage(
+      error.message ||
+      "Something went wrong while placing your order.",
+      true
+    );
+
+
     button.disabled = false;
-    button.textContent = "Submit order";
+
+    button.textContent =
+      "Submit order";
+
   }
 }
 
