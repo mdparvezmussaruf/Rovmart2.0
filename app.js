@@ -1,46 +1,311 @@
+/* =========================================================
+   ROVMART - MAIN APPLICATION
+========================================================= */
+
+
+/* =========================================================
+   PAGE INITIALIZATION
+========================================================= */
+
 document.addEventListener("DOMContentLoaded", () => {
 
+  /*
+    Clean invalid cart data first.
+  */
   cleanCart();
 
+
+  /*
+    Update cart count / floating cart.
+  */
   renderCartUI();
 
-  // Generate category menu from products.js
+
+  /*
+    Generate category menu from products.js.
+  */
   renderCategoryMenu();
 
-  // Generate all products
-  renderProductGrid();
 
+  /*
+    Check whether a category was requested
+    through the URL.
+
+    Example:
+
+    index.html?category=T-Shirts#shop
+  */
+  const requestedCategory =
+    getRequestedCategory();
+
+
+  /*
+    Render products.
+
+    If a valid category exists in the URL,
+    show that category.
+  */
+  renderProductGrid(
+    requestedCategory || "All products"
+  );
+
+
+  /*
+    Highlight the selected category.
+  */
+  setActiveCategory(
+    requestedCategory || "All products"
+  );
+
+
+  /*
+    Bind site-wide events.
+  */
   bindGlobalEvents();
 
+
+  /*
+    Scroll reveal animations.
+  */
   initReveal();
 
+
+  /*
+    Custom desktop cursor.
+  */
   initCursor();
-
-
-  const imagePath =
-    new URLSearchParams(location.search).get("id");
-
-  if (
-    document.getElementById("productDetail") &&
-    imagePath
-  ) {
-    // product.html has an inline call to renderProductDetail().
-  }
 
 });
 
-function renderProductGrid(category = "All products") {
+
+/* =========================================================
+   GET CATEGORY FROM URL
+========================================================= */
+
+function getRequestedCategory() {
+
+  const params =
+    new URLSearchParams(
+      window.location.search
+    );
+
+
+  const category =
+    params.get("category");
+
+
+  if (!category) {
+    return "";
+  }
+
+
+  /*
+    Only accept a category that actually
+    exists in products.js.
+  */
+  const categories =
+    getCategories();
+
+
+  if (
+    categories.includes(category)
+  ) {
+
+    return category;
+
+  }
+
+
+  return "";
+
+}
+
+
+/* =========================================================
+   GET PRODUCT CATEGORIES
+========================================================= */
+
+function getCategories() {
+
+  /*
+    Read unique category names
+    directly from products.js.
+  */
+
+  const categories = [
+
+    ...new Set(
+
+      products
+
+        .filter(
+          product =>
+            product.available
+        )
+
+        .map(
+          product =>
+            String(
+              product.category || ""
+            ).trim()
+        )
+
+        .filter(Boolean)
+
+    )
+
+  ];
+
+
+  return [
+
+    "All products",
+
+    ...categories
+
+  ];
+
+}
+
+
+/* =========================================================
+   RENDER CATEGORY MENU
+========================================================= */
+
+function renderCategoryMenu() {
+
+  const list =
+    document.getElementById(
+      "categoryList"
+    );
+
+
+  if (!list) {
+    return;
+  }
+
+
+  const categories =
+    getCategories();
+
+
+  list.innerHTML =
+    categories.map(
+      (category, index) => {
+
+        return `
+
+          <button
+            class="category-item ${
+              index === 0
+                ? "active"
+                : ""
+            }"
+            type="button"
+            data-category="${escapeHtml(
+              category
+            )}"
+          >
+
+            <span
+              class="category-number"
+            >
+              ${String(index + 1).padStart(
+                2,
+                "0"
+              )}
+            </span>
+
+
+            <span
+              class="category-item-name"
+            >
+              ${escapeHtml(
+                category
+              )}
+            </span>
+
+
+            <span
+              class="category-arrow"
+            >
+              ↗
+            </span>
+
+          </button>
+
+        `;
+
+      }
+    ).join("");
+
+}
+
+
+/* =========================================================
+   SET ACTIVE CATEGORY
+========================================================= */
+
+function setActiveCategory(
+  category
+) {
+
+  document
+    .querySelectorAll(
+      ".category-item"
+    )
+    .forEach(button => {
+
+      button.classList.toggle(
+        "active",
+        button.dataset.category ===
+          category
+      );
+
+    });
+
+}
+
+
+/* =========================================================
+   RENDER PRODUCT GRID
+========================================================= */
+
+function renderProductGrid(
+  category = "All products"
+) {
 
   const grid =
-    document.getElementById("productGrid");
+    document.getElementById(
+      "productGrid"
+    );
 
-  if (!grid) return;
+
+  /*
+    product.html does not contain
+    a product grid.
+
+    Category clicks from product.html
+    are handled by filterByCategory().
+  */
+  if (!grid) {
+    return;
+  }
 
 
+  /*
+    Only display available products.
+  */
   const availableProducts =
-    products.filter(product => product.available);
+    products.filter(
+      product =>
+        product.available
+    );
 
 
+  /*
+    Apply category filter.
+  */
   const visibleProducts =
     category === "All products"
 
@@ -48,12 +313,20 @@ function renderProductGrid(category = "All products") {
 
       : availableProducts.filter(
           product =>
-            product.category === category
+            String(
+              product.category || ""
+            ).trim() === category
         );
 
 
+  /*
+    Product count.
+  */
   const count =
-    document.getElementById("productCount");
+    document.getElementById(
+      "productCount"
+    );
+
 
   if (count) {
 
@@ -67,18 +340,26 @@ function renderProductGrid(category = "All products") {
   }
 
 
-  if (!visibleProducts.length) {
+  /*
+    No matching products.
+  */
+  if (
+    visibleProducts.length === 0
+  ) {
 
     grid.innerHTML = `
 
-      <div class="empty-category">
+      <div
+        class="empty-category"
+      >
 
         <p class="eyebrow">
           NO PRODUCTS
         </p>
 
         <h3>
-          No products in this category yet.
+          No products in this
+          category yet.
         </h3>
 
       </div>
@@ -89,158 +370,321 @@ function renderProductGrid(category = "All products") {
   }
 
 
+  /*
+    Generate product cards.
+  */
   grid.innerHTML =
-    visibleProducts.map((product, index) => {
+    visibleProducts.map(
+      (product, index) => {
 
-      return `
+        return `
 
-        <article
-          class="product-card reveal"
-          style="--delay:${index * 70}ms"
-        >
-
-          <a
-            class="product-image-wrap zoom-image"
-            href="product.html?id=${encodeURIComponent(product.id)}"
+          <article
+            class="product-card reveal"
+            style="--delay:${
+              index * 70
+            }ms"
           >
 
-            <span class="product-index">
-              ${String(index + 1).padStart(2, "0")}
-            </span>
+            <!-- PRODUCT IMAGE -->
 
-            <img
-              src="${escapeHtml(product.image)}"
-              alt="${escapeHtml(product.name)}"
-              loading="lazy"
+            <a
+              class="product-image-wrap zoom-image"
+              href="product.html?id=${encodeURIComponent(
+                product.id
+              )}"
+              aria-label="View ${
+                escapeHtml(
+                  product.name
+                )
+              }"
             >
 
-            <span class="image-hover-label">
-              View piece <b>↗</b>
-            </span>
-
-            <span
-              class="zoom-lens"
-              aria-hidden="true"
-            ></span>
-
-          </a>
-
-
-          <div class="product-card-info">
-
-            <div class="product-copy">
-
-              <span class="product-category">
-                ${escapeHtml(product.category)}
-              </span>
-
-              <a
-                class="product-title"
-                href="product.html?id=${encodeURIComponent(product.id)}"
+              <span
+                class="product-index"
               >
-                ${escapeHtml(product.name)}
-              </a>
-
-              <span class="product-price">
-                ${formatBDT(product.price)}
+                ${String(
+                  index + 1
+                ).padStart(2, "0")}
               </span>
+
+
+              <img
+                src="${escapeHtml(
+                  product.image
+                )}"
+                alt="${escapeHtml(
+                  product.name
+                )}"
+                loading="lazy"
+              >
+
+
+              <span
+                class="image-hover-label"
+              >
+                View piece
+                <b>↗</b>
+              </span>
+
+
+              <span
+                class="zoom-lens"
+                aria-hidden="true"
+              ></span>
+
+            </a>
+
+
+            <!-- PRODUCT INFORMATION -->
+
+            <div
+              class="product-card-info"
+            >
+
+              <div
+                class="product-copy"
+              >
+
+                <span
+                  class="product-category"
+                >
+                  ${escapeHtml(
+                    product.category
+                  )}
+                </span>
+
+
+                <a
+                  class="product-title"
+                  href="product.html?id=${encodeURIComponent(
+                    product.id
+                  )}"
+                >
+                  ${escapeHtml(
+                    product.name
+                  )}
+                </a>
+
+
+                <span
+                  class="product-price"
+                >
+                  ${formatBDT(
+                    product.price
+                  )}
+                </span>
+
+              </div>
+
+
+              <button
+                class="button button-small button-outline"
+                type="button"
+                data-add="${escapeHtml(
+                  product.id
+                )}"
+              >
+
+                <span>
+                  Add
+                </span>
+
+                <b>
+                  +
+                </b>
+
+              </button>
 
             </div>
 
+          </article>
 
-            <button
-              class="button button-small button-outline"
-              type="button"
-              data-add="${product.id}"
-            >
-              <span>Add</span>
-              <b>+</b>
-            </button>
+        `;
 
-          </div>
-
-        </article>
-
-      `;
-
-    }).join("");
+      }
+    ).join("");
 
 
+  /*
+    Re-initialize image zoom
+    after creating the cards.
+  */
   setupZoomImages();
 
+
+  /*
+    Re-run reveal animation for
+    newly generated product cards.
+  */
   initReveal();
+
 }
 
 
-function filterByCategory(category) {
+/* =========================================================
+   FILTER BY CATEGORY
+========================================================= */
 
-  renderProductGrid(category);
+function filterByCategory(
+  category
+) {
 
-
-  document
-    .querySelectorAll(".category-item")
-    .forEach(button => {
-
-      button.classList.toggle(
-        "active",
-        button.dataset.category === category
-      );
-
-    });
+  /*
+    Make sure requested category exists.
+  */
+  const categories =
+    getCategories();
 
 
+  if (
+    !categories.includes(
+      category
+    )
+  ) {
+
+    category =
+      "All products";
+
+  }
+
+
+  /*
+    If we're already on the
+    landing page, filter directly.
+  */
+  const grid =
+    document.getElementById(
+      "productGrid"
+    );
+
+
+  if (!grid) {
+
+    /*
+      We are on product.html.
+
+      Send the customer back to the
+      landing page with the selected
+      category in the URL.
+    */
+
+    window.location.href =
+      `index.html?category=${encodeURIComponent(
+        category
+      )}#shop`;
+
+    return;
+
+  }
+
+
+  /*
+    Render selected category.
+  */
+  renderProductGrid(
+    category
+  );
+
+
+  /*
+    Update active menu item.
+  */
+  setActiveCategory(
+    category
+  );
+
+
+  /*
+    Close category menu.
+  */
   closeCategoryMenu();
 
 
+  /*
+    Smoothly move to product section.
+  */
   const shop =
-    document.getElementById("shop");
+    document.getElementById(
+      "shop"
+    );
+
 
   if (shop) {
 
-    requestAnimationFrame(() => {
+    requestAnimationFrame(
+      () => {
 
-      const top =
-        shop.getBoundingClientRect().top
-        + window.scrollY
-        - 95;
+        const top =
+          shop.getBoundingClientRect()
+            .top +
+          window.scrollY -
+          95;
 
-      window.scrollTo({
 
-        top: top,
+        window.scrollTo({
 
-        behavior: "smooth"
+          top,
 
-      });
+          behavior:
+            "smooth"
 
-    });
+        });
+
+      }
+    );
 
   }
+
 }
+
+
+/* =========================================================
+   CATEGORY MENU - OPEN / CLOSE
+========================================================= */
 
 function toggleCategoryMenu() {
 
   const menu =
-    document.getElementById("categoryMenu");
+    document.getElementById(
+      "categoryMenu"
+    );
+
 
   const overlay =
-    document.getElementById("categoryOverlay");
+    document.getElementById(
+      "categoryOverlay"
+    );
+
 
   const toggle =
-    document.getElementById("menuToggle");
+    document.getElementById(
+      "menuToggle"
+    );
 
-  if (!menu || !overlay || !toggle) {
+
+  if (
+    !menu ||
+    !overlay ||
+    !toggle
+  ) {
+
     return;
+
   }
 
 
   const isOpen =
-    !menu.classList.contains("open");
+    !menu.classList.contains(
+      "open"
+    );
 
 
   menu.classList.toggle(
     "open",
     isOpen
   );
+
 
   overlay.classList.toggle(
     "hidden",
@@ -270,27 +714,53 @@ function toggleCategoryMenu() {
     "no-scroll",
     isOpen
   );
+
 }
+
+
+/* =========================================================
+   CLOSE CATEGORY MENU
+========================================================= */
 
 function closeCategoryMenu() {
 
   const menu =
-    document.getElementById("categoryMenu");
+    document.getElementById(
+      "categoryMenu"
+    );
+
 
   const overlay =
-    document.getElementById("categoryOverlay");
+    document.getElementById(
+      "categoryOverlay"
+    );
+
 
   const toggle =
-    document.getElementById("menuToggle");
+    document.getElementById(
+      "menuToggle"
+    );
 
-  if (!menu || !overlay || !toggle) {
+
+  if (
+    !menu ||
+    !overlay ||
+    !toggle
+  ) {
+
     return;
+
   }
 
 
-  menu.classList.remove("open");
+  menu.classList.remove(
+    "open"
+  );
 
-  overlay.classList.add("hidden");
+
+  overlay.classList.add(
+    "hidden"
+  );
 
 
   menu.setAttribute(
@@ -305,360 +775,1263 @@ function closeCategoryMenu() {
   );
 
 
-  toggle.classList.remove("active");
-
-
-  document.body.classList.remove(
-    "no-scroll"
+  toggle.classList.remove(
+    "active"
   );
+
+
+  /*
+    Only unlock page scrolling if
+    no other overlay is open.
+  */
+  if (
+    !document.querySelector(
+      ".drawer-backdrop:not(.hidden)"
+    ) &&
+    !document.querySelector(
+      ".modal-backdrop:not(.hidden)"
+    )
+  ) {
+
+    document.body.classList.remove(
+      "no-scroll"
+    );
+
+  }
+
 }
 
+
+/* =========================================================
+   PRODUCT DETAIL
+========================================================= */
+
 function renderProductDetail() {
-  const container = document.getElementById("productDetail");
-  if (!container) return;
 
-  const id = new URLSearchParams(location.search).get("id");
-  const product = products.find(p => p.id === id);
+  const container =
+    document.getElementById(
+      "productDetail"
+    );
 
-  if (!product) {
-    container.innerHTML = `
-      <div class="not-found">
-        <p class="eyebrow">NOT FOUND</p>
-        <h1>That piece doesn't exist.</h1>
-        <a class="button button-dark" href="index.html#shop">Back to collection</a>
-      </div>
-    `;
+
+  if (!container) {
     return;
   }
 
-  document.title = `${product.name} — NOIRÉ`;
 
+  const id =
+    new URLSearchParams(
+      window.location.search
+    ).get("id");
+
+
+  const product =
+    products.find(
+      item =>
+        item.id === id
+    );
+
+
+  /*
+    Product not found.
+  */
+  if (!product) {
+
+    container.innerHTML = `
+
+      <div class="not-found">
+
+        <p class="eyebrow">
+          NOT FOUND
+        </p>
+
+        <h1>
+          That piece doesn't exist.
+        </h1>
+
+        <a
+          class="button button-dark"
+          href="index.html#shop"
+        >
+          Back to collection
+        </a>
+
+      </div>
+
+    `;
+
+    return;
+  }
+
+
+  /*
+    Browser title.
+  */
+  document.title =
+    `${product.name} — ROVMART`;
+
+
+  /*
+    Product detail HTML.
+  */
   container.innerHTML = `
-    <div class="detail-media-column">
-      <div class="detail-image zoom-image">
-        <span class="detail-index">NOIRÉ / ${escapeHtml(product.id)}</span>
-        <img src="${escapeHtml(product.image)}" alt="${escapeHtml(product.name)}">
-        <span class="zoom-lens" aria-hidden="true"></span>
+
+    <div
+      class="detail-media-column"
+    >
+
+      <div
+        class="detail-image zoom-image"
+      >
+
+        <span
+          class="detail-index"
+        >
+          ROVMART /
+          ${escapeHtml(
+            product.id
+          )}
+        </span>
+
+
+        <img
+          src="${escapeHtml(
+            product.image
+          )}"
+          alt="${escapeHtml(
+            product.name
+          )}"
+        >
+
+
+        <span
+          class="zoom-lens"
+          aria-hidden="true"
+        ></span>
+
       </div>
-      <p class="media-caption">Hover to inspect the texture and finish.</p>
+
+
+      <p
+        class="media-caption"
+      >
+        Hover to inspect the
+        texture and finish.
+      </p>
+
     </div>
-    <div class="detail-copy">
-      <p class="eyebrow">${escapeHtml(product.category)}</p>
-      <h1>${escapeHtml(product.name)}</h1>
-      <div class="price-line">
-        <strong>${formatBDT(product.price)}</strong>
-        ${product.oldPrice ? `<del>${formatBDT(product.oldPrice)}</del>` : ""}
+
+
+    <div
+      class="detail-copy"
+    >
+
+      <p
+        class="eyebrow"
+      >
+        ${escapeHtml(
+          product.category
+        )}
+        /
+        ${escapeHtml(
+          product.id
+        )}
+      </p>
+
+
+      <h1>
+        ${escapeHtml(
+          product.name
+        )}
+        <span>.</span>
+      </h1>
+
+
+      <div
+        class="price-line"
+      >
+
+        <strong>
+          ${formatBDT(
+            product.price
+          )}
+        </strong>
+
+
+        ${
+          product.oldPrice
+            ? `
+              <del>
+                ${formatBDT(
+                  product.oldPrice
+                )}
+              </del>
+            `
+            : ""
+        }
+
       </div>
-      <p class="detail-description">${escapeHtml(product.description)}</p>
-      <ul class="detail-list">
-        ${product.details.map(detail => `<li>${escapeHtml(detail)}</li>`).join("")}
+
+
+      <p
+        class="detail-description"
+      >
+        ${escapeHtml(
+          product.description
+        )}
+      </p>
+
+
+      <ul
+        class="detail-list"
+      >
+
+        ${product.details
+          .map(
+            detail =>
+              `
+                <li>
+                  ${escapeHtml(
+                    detail
+                  )}
+                </li>
+              `
+          )
+          .join("")}
+
       </ul>
-      <div class="purchase-row">
-        <label class="quantity-selector">
-          <span>Qty</span>
-          <button type="button" data-detail-minus>−</button>
-          <input id="detailQuantity" type="number" min="1" max="99" value="1" aria-label="Quantity">
-          <button type="button" data-detail-plus>+</button>
+
+
+      <div
+        class="purchase-row"
+      >
+
+        <label
+          class="quantity-selector"
+        >
+
+          <span>
+            Qty
+          </span>
+
+
+          <button
+            type="button"
+            data-detail-minus
+            aria-label="Decrease quantity"
+          >
+            −
+          </button>
+
+
+          <input
+            id="detailQuantity"
+            type="number"
+            min="1"
+            max="99"
+            value="1"
+            aria-label="Quantity"
+          >
+
+
+          <button
+            type="button"
+            data-detail-plus
+            aria-label="Increase quantity"
+          >
+            +
+          </button>
+
         </label>
-        <button class="button button-dark" type="button" data-detail-add="${product.id}">
-          ${product.available ? "Add to cart" : "Unavailable"}
+
+
+        <button
+          class="button button-dark"
+          type="button"
+          data-detail-add="${escapeHtml(
+            product.id
+          )}"
+          ${
+            product.available
+              ? ""
+              : "disabled"
+          }
+        >
+          ${
+            product.available
+              ? "Add to cart"
+              : "Unavailable"
+          }
         </button>
+
       </div>
-      <p class="availability">${product.available ? "In stock" : "Currently unavailable"}</p>
+
+
+      <p
+        class="availability"
+      >
+        ${
+          product.available
+            ? "In stock"
+            : "Currently unavailable"
+        }
+      </p>
+
     </div>
+
   `;
 
+
+  /*
+    Enable image zoom.
+  */
   setupZoomImages();
+
+
+  /*
+    Enable reveal animation.
+  */
   initReveal();
 
-  const qtyInput = document.getElementById("detailQuantity");
-  const addButton = container.querySelector("[data-detail-add]");
-  container.querySelector("[data-detail-minus]")?.addEventListener("click", () => {
-    qtyInput.value = Math.max(1, Number(qtyInput.value) - 1);
-  });
-  container.querySelector("[data-detail-plus]")?.addEventListener("click", () => {
-    qtyInput.value = Math.min(99, Number(qtyInput.value) + 1);
-  });
-  addButton?.addEventListener("click", () => addToCart(product.id, Number(qtyInput.value)));
-}
 
-function setupZoomImages() {
-  document.querySelectorAll(".zoom-image").forEach(wrapper => {
-    const img = wrapper.querySelector("img");
-    const lens = wrapper.querySelector(".zoom-lens");
-    if (!img || !lens) return;
+  /*
+    Quantity controls.
+  */
+  const qtyInput =
+    document.getElementById(
+      "detailQuantity"
+    );
 
-    const move = event => {
-      if (event.pointerType === "touch") return;
-      const rect = wrapper.getBoundingClientRect();
-      const x = Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width));
-      const y = Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height));
-      img.style.transformOrigin = `${x * 100}% ${y * 100}%`;
-      img.style.transform = "scale(2.15)";
-      lens.style.left = `${x * 100}%`;
-      lens.style.top = `${y * 100}%`;
-      lens.classList.add("active");
-    };
 
-    const reset = () => {
-      img.style.transform = "";
-      img.style.transformOrigin = "";
-      lens.classList.remove("active");
-    };
+  const addButton =
+    container.querySelector(
+      "[data-detail-add]"
+    );
 
-    wrapper.addEventListener("pointermove", move);
-    wrapper.addEventListener("pointerleave", reset);
-  });
-}
 
-function bindGlobalEvents() {
+  const minusButton =
+    container.querySelector(
+      "[data-detail-minus]"
+    );
 
-  document
-  .getElementById("menuToggle")
-  ?.addEventListener(
+
+  const plusButton =
+    container.querySelector(
+      "[data-detail-plus]"
+    );
+
+
+  minusButton?.addEventListener(
     "click",
-    toggleCategoryMenu
-  );
+    () => {
+
+      if (!qtyInput) {
+        return;
+      }
 
 
-document
-  .getElementById("closeMenuBtn")
-  ?.addEventListener(
-    "click",
-    closeCategoryMenu
-  );
+      const current =
+        Number(
+          qtyInput.value
+        ) || 1;
 
 
-document
-  .getElementById("categoryOverlay")
-  ?.addEventListener(
-    "click",
-    closeCategoryMenu
-  );
-
-
-document
-  .getElementById("categoryList")
-  ?.addEventListener(
-    "click",
-    event => {
-
-      const button =
-        event.target.closest(
-          "[data-category]"
+      qtyInput.value =
+        Math.max(
+          1,
+          current - 1
         );
 
-      if (!button) return;
+    }
+  );
 
-      filterByCategory(
-        button.dataset.category
+
+  plusButton?.addEventListener(
+    "click",
+    () => {
+
+      if (!qtyInput) {
+        return;
+      }
+
+
+      const current =
+        Number(
+          qtyInput.value
+        ) || 1;
+
+
+      qtyInput.value =
+        Math.min(
+          99,
+          current + 1
+        );
+
+    }
+  );
+
+
+  /*
+    Add selected quantity
+    to cart.
+  */
+  addButton?.addEventListener(
+    "click",
+    () => {
+
+      if (!qtyInput) {
+        return;
+      }
+
+
+      const quantity =
+        Math.max(
+          1,
+          Math.min(
+            99,
+            Number(
+              qtyInput.value
+            ) || 1
+          )
+        );
+
+
+      addToCart(
+        product.id,
+        quantity
       );
 
     }
   );
 
+}
 
-  document.addEventListener("click", event => {
-    const add = event.target.closest("[data-add]");
-    if (add) addToCart(add.dataset.add);
 
-    const plus = event.target.closest("[data-cart-plus]");
-    if (plus) {
-      const item = getCart().find(i => i.id === plus.dataset.cartPlus);
-      if (item) updateCartQuantity(item.id, item.quantity + 1);
-    }
+/* =========================================================
+   IMAGE ZOOM
+========================================================= */
 
-    const minus = event.target.closest("[data-cart-minus]");
-    if (minus) {
-      const item = getCart().find(i => i.id === minus.dataset.cartMinus);
-      if (item) updateCartQuantity(item.id, item.quantity - 1);
-    }
+function setupZoomImages() {
 
-    const remove = event.target.closest("[data-cart-remove]");
-    if (remove) removeFromCart(remove.dataset.cartRemove);
-  });
+  document
+    .querySelectorAll(
+      ".zoom-image"
+    )
+    .forEach(wrapper => {
 
-  document.getElementById("cartLink")?.addEventListener("click", openCartDrawer);
-  document.getElementById("closeCartBtn")?.addEventListener("click", closeCartDrawer);
-  document.getElementById("cartDrawer")?.addEventListener("click", e => {
-    if (e.target.id === "cartDrawer") closeCartDrawer();
-  });
+      const img =
+        wrapper.querySelector(
+          "img"
+        );
 
-  document.getElementById("confirmOrderBtn")?.addEventListener("click", openOrderModal);
-  document.getElementById("drawerConfirmBtn")?.addEventListener("click", () => {
-    closeCartDrawer();
-    openOrderModal();
-  });
 
-  document.getElementById("closeOrderBtn")?.addEventListener("click", closeOrderModal);
-  document.getElementById("orderModal")?.addEventListener("click", e => {
-    if (e.target.id === "orderModal") closeOrderModal();
-  });
-  document.getElementById("orderForm")?.addEventListener("submit", submitOrder);
+      const lens =
+        wrapper.querySelector(
+          ".zoom-lens"
+        );
 
-  document.addEventListener("keydown", e => {
 
-  if (e.key === "Escape") {
+      if (
+        !img ||
+        !lens
+      ) {
 
-    closeCartDrawer();
+        return;
 
-    closeOrderModal();
+      }
 
-    closeCategoryMenu();
 
-  }
+      /*
+        Prevent adding duplicate
+        listeners if zoom is reinitialized.
+      */
+      if (
+        wrapper.dataset.zoomReady ===
+        "true"
+      ) {
 
-});
+        return;
 
-document
-  .querySelectorAll(
-    'input[name="deliveryArea"]'
-  )
-  .forEach(input => {
+      }
 
-    input.addEventListener(
-      "change",
-      () => {
 
-        updateDeliverySummary();
+      wrapper.dataset.zoomReady =
+        "true";
 
-        const error =
-          document.getElementById(
-            "deliveryAreaError"
+
+      const move =
+        event => {
+
+          /*
+            Touchscreens don't use
+            cursor-following zoom.
+          */
+          if (
+            event.pointerType ===
+            "touch"
+          ) {
+
+            return;
+
+          }
+
+
+          const rect =
+            wrapper.getBoundingClientRect();
+
+
+          if (
+            rect.width <= 0 ||
+            rect.height <= 0
+          ) {
+
+            return;
+
+          }
+
+
+          const x =
+            Math.max(
+              0,
+              Math.min(
+                1,
+                (
+                  event.clientX -
+                  rect.left
+                ) / rect.width
+              )
+            );
+
+
+          const y =
+            Math.max(
+              0,
+              Math.min(
+                1,
+                (
+                  event.clientY -
+                  rect.top
+                ) / rect.height
+              )
+            );
+
+
+          img.style.transformOrigin =
+            `${x * 100}% ${y * 100}%`;
+
+
+          img.style.transform =
+            "scale(2.15)";
+
+
+          lens.style.left =
+            `${x * 100}%`;
+
+
+          lens.style.top =
+            `${y * 100}%`;
+
+
+          lens.classList.add(
+            "active"
           );
 
-        if (error) {
-          error.textContent = "";
+        };
+
+
+      const reset =
+        () => {
+
+          img.style.transform =
+            "";
+
+          img.style.transformOrigin =
+            "";
+
+          lens.classList.remove(
+            "active"
+          );
+
+        };
+
+
+      wrapper.addEventListener(
+        "pointermove",
+        move
+      );
+
+
+      wrapper.addEventListener(
+        "pointerleave",
+        reset
+      );
+
+
+    });
+
+}
+
+
+/* =========================================================
+   GLOBAL EVENT BINDINGS
+========================================================= */
+
+function bindGlobalEvents() {
+
+  /*
+    Hamburger category menu.
+  */
+
+  document
+    .getElementById(
+      "menuToggle"
+    )
+    ?.addEventListener(
+      "click",
+      toggleCategoryMenu
+    );
+
+
+  document
+    .getElementById(
+      "closeMenuBtn"
+    )
+    ?.addEventListener(
+      "click",
+      closeCategoryMenu
+    );
+
+
+  document
+    .getElementById(
+      "categoryOverlay"
+    )
+    ?.addEventListener(
+      "click",
+      closeCategoryMenu
+    );
+
+
+  /*
+    Category clicks.
+  */
+
+  document
+    .getElementById(
+      "categoryList"
+    )
+    ?.addEventListener(
+      "click",
+      event => {
+
+        const button =
+          event.target.closest(
+            "[data-category]"
+          );
+
+
+        if (!button) {
+          return;
+        }
+
+
+        filterByCategory(
+          button.dataset.category
+        );
+
+      }
+    );
+
+
+  /*
+    Product add-to-cart buttons
+    and cart quantity controls.
+  */
+
+  document.addEventListener(
+    "click",
+    event => {
+
+      /*
+        Product card Add button.
+      */
+
+      const addButton =
+        event.target.closest(
+          "[data-add]"
+        );
+
+
+      if (addButton) {
+
+        addToCart(
+          addButton.dataset.add
+        );
+
+      }
+
+
+      /*
+        Increase cart quantity.
+      */
+
+      const plus =
+        event.target.closest(
+          "[data-cart-plus]"
+        );
+
+
+      if (plus) {
+
+        const item =
+          getCart().find(
+            cartItem =>
+              cartItem.id ===
+              plus.dataset.cartPlus
+          );
+
+
+        if (item) {
+
+          updateCartQuantity(
+            item.id,
+            item.quantity + 1
+          );
+
+        }
+
+      }
+
+
+      /*
+        Decrease cart quantity.
+      */
+
+      const minus =
+        event.target.closest(
+          "[data-cart-minus]"
+        );
+
+
+      if (minus) {
+
+        const item =
+          getCart().find(
+            cartItem =>
+              cartItem.id ===
+              minus.dataset.cartMinus
+          );
+
+
+        if (item) {
+
+          updateCartQuantity(
+            item.id,
+            item.quantity - 1
+          );
+
+        }
+
+      }
+
+
+      /*
+        Remove cart item.
+      */
+
+      const remove =
+        event.target.closest(
+          "[data-cart-remove]"
+        );
+
+
+      if (remove) {
+
+        removeFromCart(
+          remove.dataset.cartRemove
+        );
+
+      }
+
+    }
+  );
+
+
+  /*
+    Cart drawer.
+  */
+
+  document
+    .getElementById(
+      "cartLink"
+    )
+    ?.addEventListener(
+      "click",
+      openCartDrawer
+    );
+
+
+  document
+    .getElementById(
+      "closeCartBtn"
+    )
+    ?.addEventListener(
+      "click",
+      closeCartDrawer
+    );
+
+
+  document
+    .getElementById(
+      "cartDrawer"
+    )
+    ?.addEventListener(
+      "click",
+      event => {
+
+        if (
+          event.target.id ===
+          "cartDrawer"
+        ) {
+
+          closeCartDrawer();
+
         }
 
       }
     );
 
-  });
 
-  document.addEventListener("change", event => {
+  /*
+    IMPORTANT:
+    Order form submission is handled
+    by order.js.
+  */
+
+  document
+    .getElementById(
+      "confirmOrderBtn"
+    )
+    ?.addEventListener(
+      "click",
+      openOrderModal
+    );
+
+
+  document
+    .getElementById(
+      "drawerConfirmBtn"
+    )
+    ?.addEventListener(
+      "click",
+      () => {
+
+        closeCartDrawer();
+
+        openOrderModal();
+
+      }
+    );
+
+
+  /*
+    Checkout modal.
+  */
+
+  document
+    .getElementById(
+      "closeOrderBtn"
+    )
+    ?.addEventListener(
+      "click",
+      closeOrderModal
+    );
+
+
+  document
+    .getElementById(
+      "orderModal"
+    )
+    ?.addEventListener(
+      "click",
+      event => {
+
+        if (
+          event.target.id ===
+          "orderModal"
+        ) {
+
+          closeOrderModal();
+
+        }
+
+      }
+    );
+
+
+  /*
+    Escape key:
+    close any open overlay.
+  */
+
+  document.addEventListener(
+    "keydown",
+    event => {
+
+      if (
+        event.key !==
+        "Escape"
+      ) {
+
+        return;
+
+      }
+
+
+      closeCategoryMenu();
+
+      closeCartDrawer();
+
+      closeOrderModal();
+
+    }
+  );
+
+}
+
+
+/* =========================================================
+   CART DRAWER
+========================================================= */
+
+function openCartDrawer() {
+
+  renderCartUI();
+
+
+  const drawer =
+    document.getElementById(
+      "cartDrawer"
+    );
+
+
+  if (!drawer) {
+    return;
+  }
+
+
+  drawer.classList.remove(
+    "hidden"
+  );
+
+
+  drawer.setAttribute(
+    "aria-hidden",
+    "false"
+  );
+
+
+  document.body.classList.add(
+    "no-scroll"
+  );
+
+}
+
+
+/* =========================================================
+   CLOSE CART DRAWER
+========================================================= */
+
+function closeCartDrawer() {
+
+  const drawer =
+    document.getElementById(
+      "cartDrawer"
+    );
+
+
+  if (!drawer) {
+    return;
+  }
+
+
+  drawer.classList.add(
+    "hidden"
+  );
+
+
+  drawer.setAttribute(
+    "aria-hidden",
+    "true"
+  );
+
+
+  /*
+    Only unlock scrolling when
+    no other overlay is open.
+  */
 
   if (
-    event.target.matches(
-      'input[name="deliveryArea"]'
+    !document.querySelector(
+      ".category-menu.open"
+    ) &&
+    !document.querySelector(
+      ".modal-backdrop:not(.hidden)"
     )
   ) {
 
-    updateDeliverySummary();
+    document.body.classList.remove(
+      "no-scroll"
+    );
 
-    const error =
-      document.getElementById(
-        "deliveryAreaError"
+  }
+
+}
+
+
+/* =========================================================
+   TOAST
+========================================================= */
+
+function showToast(
+  message
+) {
+
+  let toast =
+    document.getElementById(
+      "toast"
+    );
+
+
+  if (!toast) {
+
+    toast =
+      document.createElement(
+        "div"
       );
 
-    if (error) {
-      error.textContent = "";
-    }
+
+    toast.id =
+      "toast";
+
+
+    toast.className =
+      "toast";
+
+
+    document.body.appendChild(
+      toast
+    );
 
   }
 
-});
+
+  toast.textContent =
+    message;
+
+
+  toast.classList.add(
+    "show"
+  );
+
+
+  clearTimeout(
+    window.toastTimer
+  );
+
+
+  window.toastTimer =
+    setTimeout(
+      () => {
+
+        toast.classList.remove(
+          "show"
+        );
+
+      },
+      1800
+    );
+
 }
 
-function openCartDrawer() {
-  renderCartUI();
-  const drawer = document.getElementById("cartDrawer");
-  if (!drawer) return;
-  drawer.classList.remove("hidden");
-  drawer.setAttribute("aria-hidden", "false");
-  document.body.classList.add("no-scroll");
-}
 
-function closeCartDrawer() {
-  const drawer = document.getElementById("cartDrawer");
-  if (!drawer) return;
-  drawer.classList.add("hidden");
-  drawer.setAttribute("aria-hidden", "true");
-  document.body.classList.remove("no-scroll");
-}
-
-function showToast(message) {
-  let toast = document.getElementById("toast");
-  if (!toast) {
-    toast = document.createElement("div");
-    toast.id = "toast";
-    toast.className = "toast";
-    document.body.appendChild(toast);
-  }
-  toast.textContent = message;
-  toast.classList.add("show");
-  clearTimeout(window.toastTimer);
-  window.toastTimer = setTimeout(() => toast.classList.remove("show"), 1800);
-}
+/* =========================================================
+   REVEAL ANIMATION
+========================================================= */
 
 function initReveal() {
-  const items = document.querySelectorAll(".reveal");
-  if (!("IntersectionObserver" in window)) { items.forEach(el => el.classList.add("is-visible")); return; }
-  const observer = new IntersectionObserver(entries => entries.forEach(entry => { if (entry.isIntersecting) { entry.target.classList.add("is-visible"); observer.unobserve(entry.target); } }), {threshold:.12});
-  items.forEach(el => observer.observe(el));
+
+  const items =
+    document.querySelectorAll(
+      ".reveal"
+    );
+
+
+  if (!items.length) {
+    return;
+  }
+
+
+  /*
+    Older browsers / no observer.
+  */
+
+  if (
+    !(
+      "IntersectionObserver"
+      in window
+    )
+  ) {
+
+    items.forEach(
+      element =>
+        element.classList.add(
+          "is-visible"
+        )
+    );
+
+    return;
+
+  }
+
+
+  const observer =
+    new IntersectionObserver(
+      entries => {
+
+        entries.forEach(
+          entry => {
+
+            if (
+              entry.isIntersecting
+            ) {
+
+              entry.target.classList.add(
+                "is-visible"
+              );
+
+
+              observer.unobserve(
+                entry.target
+              );
+
+            }
+
+          }
+        );
+
+      },
+      {
+        threshold: 0.12
+      }
+    );
+
+
+  items.forEach(
+    item =>
+      observer.observe(
+        item
+      )
+  );
+
 }
+
+
+/* =========================================================
+   CUSTOM CURSOR
+========================================================= */
 
 function initCursor() {
-  const dot=document.getElementById("cursorDot");
-  if(!dot || window.matchMedia("(pointer: coarse)").matches) return;
-  document.addEventListener("pointermove", e => { dot.style.transform=`translate3d(${e.clientX}px,${e.clientY}px,0)`; });
-  document.addEventListener("pointerover", e => dot.classList.toggle("cursor-active", !!e.target.closest("a,button,.zoom-image")));
-}
 
-function getCategories() {
-
-  const categories = [
-    ...new Set(
-      products
-        .filter(product => product.available)
-        .map(product => String(product.category || "").trim())
-        .filter(Boolean)
-    )
-  ];
-
-  return [
-    "All products",
-    ...categories
-  ];
-}
+  const dot =
+    document.getElementById(
+      "cursorDot"
+    );
 
 
-function renderCategoryMenu() {
+  /*
+    Don't use custom cursor on
+    touch devices.
+  */
 
-  const list =
-    document.getElementById("categoryList");
+  if (
+    !dot ||
+    window.matchMedia(
+      "(pointer: coarse)"
+    ).matches
+  ) {
 
-  if (!list) return;
+    return;
+
+  }
 
 
-  const categories =
-    getCategories();
+  let frame =
+    null;
 
 
-  list.innerHTML =
-    categories.map((category, index) => {
+  let x =
+    window.innerWidth / 2;
 
-      return `
-        <button
-          class="category-item ${index === 0 ? "active" : ""}"
-          type="button"
-          data-category="${escapeHtml(category)}"
-        >
 
-          <span class="category-number">
-            ${String(index + 1).padStart(2, "0")}
-          </span>
+  let y =
+    window.innerHeight / 2;
 
-          <span class="category-item-name">
-            ${escapeHtml(category)}
-          </span>
 
-          <span class="category-arrow">
-            ↗
-          </span>
+  document.addEventListener(
+    "pointermove",
+    event => {
 
-        </button>
-      `;
+      x =
+        event.clientX;
 
-    }).join("");
+      y =
+        event.clientY;
+
+
+      if (frame) {
+        return;
+      }
+
+
+      frame =
+        requestAnimationFrame(
+          () => {
+
+            dot.style.transform =
+              `translate3d(
+                ${x}px,
+                ${y}px,
+                0
+              )`;
+
+
+            frame =
+              null;
+
+          }
+        );
+
+    }
+  );
+
+
+  document.addEventListener(
+    "pointerover",
+    event => {
+
+      const interactive =
+        event.target.closest(
+          "a, button, .zoom-image"
+        );
+
+
+      dot.classList.toggle(
+        "cursor-active",
+        !!interactive
+      );
+
+    }
+  );
+
 }
