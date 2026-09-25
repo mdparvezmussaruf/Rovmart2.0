@@ -583,3 +583,16 @@ input:checked
     .footer-logo { font-size: 24px; } 
     .footer-brand p { max-width: 330px; } 
     .footer-bottom { align-items: flex-start; flex-direction: column; gap: 9px; } }
+
+
+
+    .order-submit-frame {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  right: 0;
+  bottom: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
