@@ -1,32 +1,38 @@
 /*
  * ============================================================
- * ROVMART - Order / Checkout Flow
+ * ROVMART - ORDER / CHECKOUT SYSTEM
  * ============================================================
  *
- * Submission architecture:
+ * Flow:
  *
  * Customer
  *    ↓
- * order.js
+ * Checkout form
  *    ↓
- * Native HTML Form POST
+ * order.js validation
  *    ↓
- * Google Apps Script Web App
+ * Native HTML form POST
+ *    ↓
+ * Google Apps Script
  *    ↓
  * Google Sheets
  *    ↓
- * HTML response in hidden iframe
+ * HTML response inside hidden iframe
  *    ↓
- * postMessage()
+ * window.parent.postMessage()
  *    ↓
- * order.js
+ * order.js receives result
  *    ↓
- * Order success screen
+ * Success / Error
  *
  * IMPORTANT:
- * - Browser sends only delivery area.
- * - Browser does NOT decide delivery charge.
- * - Google Apps Script calculates the authoritative total.
+ *
+ * - Browser sends product ID + quantity.
+ * - Browser sends delivery AREA only.
+ * - Backend calculates product prices.
+ * - Backend calculates delivery charge.
+ * - Backend calculates final total.
+ *
  * ============================================================
  */
 
@@ -39,53 +45,94 @@ let pendingOrderSubmission = null;
 
 
 /* ============================================================
-   DELIVERY
+   CONFIG HELPERS
    ============================================================ */
 
-/**
- * Get selected delivery area.
- *
- * Returns:
- *   "inside"
- *   "outside"
- *   ""
- */
-function getSelectedDeliveryArea() {
+function getConfigScriptUrl() {
 
-  return (
-    document.querySelector(
-      'input[name="deliveryArea"]:checked'
-    )?.value || ""
-  );
+  if (
+    typeof CONFIG === "undefined" ||
+    !CONFIG
+  ) {
+    return "";
+  }
+
+  return String(
+    CONFIG.GOOGLE_SCRIPT_URL || ""
+  ).trim();
 
 }
 
 
-/**
- * Get frontend display delivery charge.
- *
- * IMPORTANT:
- * This is only for the UI.
- *
- * Google Apps Script calculates the real charge
- * when the order is submitted.
- */
+function isValidScriptUrl(url) {
+
+  if (!url) {
+    return false;
+  }
+
+
+  /*
+   * Reject placeholder only.
+   *
+   * IMPORTANT:
+   * Do NOT compare this against the real Apps Script URL.
+   */
+  if (
+    url.includes(
+      "https://script.google.com/macros/s/AKfycbzTMyuIddg7-jdp-Fb0U-w3kPS6BYc1v3nT30mo4siAxe-65Z1VY9c6TxsKgtPqE03wgA/exec"
+    )
+  ) {
+    return false;
+  }
+
+
+  /*
+   * Must be a Google Apps Script Web App /exec URL.
+   */
+  return /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/
+    .test(url);
+
+}
+
+
+/* ============================================================
+   DELIVERY
+   ============================================================ */
+
+function getSelectedDeliveryArea() {
+
+  const selected =
+    document.querySelector(
+      'input[name="deliveryArea"]:checked'
+    );
+
+  return selected
+    ? String(selected.value || "").trim().toLowerCase()
+    : "";
+
+}
+
+
 function getSelectedDeliveryCharge() {
 
   const area =
     getSelectedDeliveryArea();
 
+
   if (
-    typeof CONFIG !== "object" ||
+    typeof CONFIG === "undefined" ||
+    !CONFIG ||
     !CONFIG.DELIVERY_CHARGES
   ) {
     return 0;
   }
 
+
   const charge =
     Number(
       CONFIG.DELIVERY_CHARGES[area]
     );
+
 
   return Number.isFinite(charge)
     ? charge
@@ -108,9 +155,11 @@ function openOrderModal() {
     if (
       typeof showToast === "function"
     ) {
+
       showToast(
         "Your cart is empty."
       );
+
     }
 
     return;
@@ -118,13 +167,12 @@ function openOrderModal() {
   }
 
 
-  /*
-   * Close cart drawer before opening checkout.
-   */
   if (
     typeof closeCartDrawer === "function"
   ) {
+
     closeCartDrawer();
+
   }
 
 
@@ -134,19 +182,25 @@ function openOrderModal() {
     );
 
 
-  if (!modal) return;
+  if (!modal) {
+    return;
+  }
 
 
   /*
-   * No previous request should remain.
+   * Reset pending state.
    */
-  pendingOrderSubmission = null;
+  pendingOrderSubmission =
+    null;
 
 
   /*
-   * Make modal visible.
+   * Show modal.
    */
-  modal.classList.remove("hidden");
+  modal.classList.remove(
+    "hidden"
+  );
+
 
   modal.setAttribute(
     "aria-hidden",
@@ -160,7 +214,7 @@ function openOrderModal() {
 
 
   /*
-   * Render current order.
+   * Render current cart.
    */
   renderOrderSummary();
 
@@ -168,7 +222,7 @@ function openOrderModal() {
 
 
   /*
-   * Focus customer name.
+   * Focus name field.
    */
   document
     .getElementById(
@@ -186,13 +240,14 @@ function openOrderModal() {
 function closeOrderModal() {
 
   /*
-   * Do not let the customer close the modal
-   * while an order is actively submitting.
+   * Never close during submission.
    */
   if (
     pendingOrderSubmission
   ) {
+
     return;
+
   }
 
 
@@ -202,12 +257,15 @@ function closeOrderModal() {
     );
 
 
-  if (!modal) return;
+  if (!modal) {
+    return;
+  }
 
 
   modal.classList.add(
     "hidden"
   );
+
 
   modal.setAttribute(
     "aria-hidden",
@@ -247,9 +305,16 @@ function renderOrderSummary() {
 
   const subtotal =
     items.reduce(
-      (sum, item) =>
-        sum +
-        Number(item.subtotal || 0),
+      (sum, item) => {
+
+        return (
+          sum +
+          Number(
+            item.subtotal || 0
+          )
+        );
+
+      },
       0
     );
 
@@ -282,6 +347,7 @@ function renderOrderSummary() {
       YOUR ORDER
     </div>
 
+
     <div class="order-items">
 
       ${items
@@ -290,28 +356,44 @@ function renderOrderSummary() {
           const name =
             typeof escapeHtml === "function"
               ? escapeHtml(
-                  String(item.name || "")
+                  String(
+                    item.name || ""
+                  )
                 )
-              : String(item.name || "");
+              : String(
+                  item.name || ""
+                );
+
 
           const quantity =
-            Number(item.quantity || 0);
+            Number(
+              item.quantity || 0
+            );
+
 
           const price =
-            Number(item.price || 0);
+            Number(
+              item.price || 0
+            );
+
 
           const itemSubtotal =
-            Number(item.subtotal || 0);
+            Number(
+              item.subtotal || 0
+            );
 
-          const formattedPrice =
+
+          const priceText =
             typeof formatBDT === "function"
               ? formatBDT(price)
-              : `৳${price.toLocaleString()}`;
+              : `৳${price.toLocaleString("en-BD")}`;
 
-          const formattedSubtotal =
+
+          const subtotalText =
             typeof formatBDT === "function"
               ? formatBDT(itemSubtotal)
-              : `৳${itemSubtotal.toLocaleString()}`;
+              : `৳${itemSubtotal.toLocaleString("en-BD")}`;
+
 
           return `
 
@@ -327,13 +409,14 @@ function renderOrderSummary() {
                   Qty:
                   ${quantity}
                   ×
-                  ${formattedPrice}
+                  ${priceText}
                 </span>
 
               </div>
 
+
               <strong>
-                ${formattedSubtotal}
+                ${subtotalText}
               </strong>
 
             </div>
@@ -345,21 +428,24 @@ function renderOrderSummary() {
 
     </div>
 
+
     <div class="summary-total-line">
 
       <span>
         Product subtotal
       </span>
 
+
       <strong id="summarySubtotal">
         ${
           typeof formatBDT === "function"
             ? formatBDT(subtotal)
-            : `৳${subtotal.toLocaleString()}`
+            : `৳${subtotal.toLocaleString("en-BD")}`
         }
       </strong>
 
     </div>
+
 
     <div class="summary-total-line">
 
@@ -367,15 +453,19 @@ function renderOrderSummary() {
         Delivery charge
       </span>
 
+
       <strong id="deliveryChargeValue">
+
         ${
           typeof formatBDT === "function"
             ? formatBDT(deliveryCharge)
-            : `৳${deliveryCharge.toLocaleString()}`
+            : `৳${deliveryCharge.toLocaleString("en-BD")}`
         }
+
       </strong>
 
     </div>
+
 
     <div class="summary-grand">
 
@@ -383,12 +473,15 @@ function renderOrderSummary() {
         Final total
       </span>
 
+
       <strong id="summaryFinalTotal">
+
         ${
           typeof formatBDT === "function"
             ? formatBDT(finalTotal)
-            : `৳${finalTotal.toLocaleString()}`
+            : `৳${finalTotal.toLocaleString("en-BD")}`
         }
+
       </strong>
 
     </div>
@@ -414,11 +507,13 @@ function updateDeliverySummary() {
 
   const subtotal =
     typeof getCartTotal === "function"
-      ? Number(getCartTotal() || 0)
+      ? Number(
+          getCartTotal() || 0
+        )
       : 0;
 
 
-  const finalTotal =
+  const total =
     subtotal +
     charge;
 
@@ -440,7 +535,7 @@ function updateDeliverySummary() {
     chargeNode.textContent =
       typeof formatBDT === "function"
         ? formatBDT(charge)
-        : `৳${charge.toLocaleString()}`;
+        : `৳${charge.toLocaleString("en-BD")}`;
 
   }
 
@@ -449,36 +544,39 @@ function updateDeliverySummary() {
 
     finalNode.textContent =
       typeof formatBDT === "function"
-        ? formatBDT(finalTotal)
-        : `৳${finalTotal.toLocaleString()}`;
+        ? formatBDT(total)
+        : `৳${total.toLocaleString("en-BD")}`;
 
   }
 
 
   /*
-   * Update selected visual state.
+   * Update visual selection.
    */
   document
     .querySelectorAll(
       ".delivery-option"
     )
-    .forEach(option => {
+    .forEach(
+      option => {
 
-      const radio =
-        option.querySelector(
-          'input[name="deliveryArea"]'
+        const radio =
+          option.querySelector(
+            'input[name="deliveryArea"]'
+          );
+
+
+        option.classList.toggle(
+          "selected",
+          radio?.checked === true
         );
 
-      option.classList.toggle(
-        "selected",
-        radio?.checked === true
-      );
-
-    });
+      }
+    );
 
 
   /*
-   * Clear delivery error when selected.
+   * Clear delivery error.
    */
   const error =
     document.getElementById(
@@ -499,7 +597,7 @@ function updateDeliverySummary() {
 
 
 /* ============================================================
-   FIELD ERROR
+   CLEAR FIELD ERROR
    ============================================================ */
 
 function clearFieldError(
@@ -508,7 +606,9 @@ function clearFieldError(
 ) {
 
   const field =
-    document.getElementById(id);
+    document.getElementById(
+      id
+    );
 
 
   const error =
@@ -523,14 +623,17 @@ function clearFieldError(
 
 
   if (error) {
-    error.textContent = "";
+
+    error.textContent =
+      "";
+
   }
 
 }
 
 
 /* ============================================================
-   VALIDATE ORDER FORM
+   VALIDATE FORM
    ============================================================ */
 
 function validateOrderForm() {
@@ -561,7 +664,7 @@ function validateOrderForm() {
 
 
   /*
-   * Clear previous field errors.
+   * Clear errors.
    */
   [
     [
@@ -581,19 +684,27 @@ function validateOrderForm() {
     ([id, errorId]) => {
 
       const field =
-        document.getElementById(id);
+        document.getElementById(
+          id
+        );
+
 
       const error =
         document.getElementById(
           errorId
         );
 
+
       field?.classList.remove(
         "invalid"
       );
 
+
       if (error) {
-        error.textContent = "";
+
+        error.textContent =
+          "";
+
       }
 
     }
@@ -607,7 +718,10 @@ function validateOrderForm() {
 
 
   if (deliveryError) {
-    deliveryError.textContent = "";
+
+    deliveryError.textContent =
+      "";
+
   }
 
 
@@ -646,7 +760,8 @@ function validateOrderForm() {
     }
 
 
-    valid = false;
+    valid =
+      false;
 
   }
 
@@ -655,25 +770,19 @@ function validateOrderForm() {
      PHONE
      ---------------------------------------------------------- */
 
-  const rawPhone =
+  const phoneValue =
     phone
       ? phone.value.trim()
       : "";
 
 
   const normalizedPhone =
-    rawPhone.replace(
+    phoneValue.replace(
       /[\s-]/g,
       ""
     );
 
 
-  /*
-   * Bangladesh mobile formats:
-   *
-   * 01712345678
-   * +8801712345678
-   */
   if (
     !/^(01\d{9}|\+8801\d{9})$/.test(
       normalizedPhone
@@ -699,7 +808,8 @@ function validateOrderForm() {
     }
 
 
-    valid = false;
+    valid =
+      false;
 
   }
 
@@ -739,7 +849,8 @@ function validateOrderForm() {
     }
 
 
-    valid = false;
+    valid =
+      false;
 
   }
 
@@ -767,7 +878,8 @@ function validateOrderForm() {
     }
 
 
-    valid = false;
+    valid =
+      false;
 
   }
 
@@ -778,17 +890,15 @@ function validateOrderForm() {
 
 
 /* ============================================================
-   GENERATE CLIENT REQUEST ID
+   REQUEST ID
    ============================================================ */
 
 function generateRequestId() {
 
-  /*
-   * Prefer browser crypto UUID.
-   */
   if (
     window.crypto &&
-    typeof window.crypto.randomUUID === "function"
+    typeof window.crypto.randomUUID ===
+      "function"
   ) {
 
     return window.crypto.randomUUID();
@@ -796,16 +906,16 @@ function generateRequestId() {
   }
 
 
-  /*
-   * Fallback.
-   */
   return (
-    `rv-` +
+    "rv-" +
     Date.now() +
-    `-` +
+    "-" +
     Math.random()
       .toString(36)
-      .slice(2, 12)
+      .slice(
+        2,
+        12
+      )
   );
 
 }
@@ -826,8 +936,7 @@ function buildOrderData() {
   return {
 
     /*
-     * Used to match the browser request
-     * to the Apps Script response.
+     * Used to match the Apps Script response.
      */
     clientRequestId:
       generateRequestId(),
@@ -861,9 +970,11 @@ function buildOrderData() {
 
 
     /*
-     * Only the area is sent.
+     * IMPORTANT:
      *
-     * Server determines actual delivery charge.
+     * Send only the delivery area.
+     *
+     * Apps Script calculates the real charge.
      */
     deliveryArea:
       getSelectedDeliveryArea(),
@@ -878,12 +989,17 @@ function buildOrderData() {
         .trim() || "",
 
 
+    /*
+     * Send only product ID + quantity.
+     */
     items:
       items.map(
         item => ({
 
           id:
-            item.id,
+            String(
+              item.id
+            ),
 
           quantity:
             Number(
@@ -899,39 +1015,40 @@ function buildOrderData() {
 
 
 /* ============================================================
-   CHECK SCRIPT URL
+   SHOW FORM MESSAGE
    ============================================================ */
 
-function isValidScriptUrl(
-  url
+function showFormMessage(
+  message,
+  isError = false
 ) {
 
-  if (!url) {
-    return false;
+  const node =
+    document.getElementById(
+      "formMessage"
+    );
+
+
+  if (!node) {
+    return;
   }
 
 
-  /*
-   * Reject configuration placeholder.
-   */
-  if (
-    url.includes(
-      "https://script.google.com/macros/s/AKfycbzLdMDNv5qomFUZk9dFYvlSY8094VgXBj9IDOynlYecyTpyixa5htvVutqTziuOdPre_A/exec"
-    )
-  ) {
-
-    return false;
-
-  }
+  node.textContent =
+    String(
+      message || ""
+    );
 
 
-  /*
-   * Expected Google Apps Script
-   * web app URL.
-   */
-  return (
-    /^https:\/\/script\.google\.com\/macros\/s\/[^/]+\/exec(?:\?.*)?$/
-      .test(url)
+  node.classList.toggle(
+    "error-state",
+    Boolean(isError)
+  );
+
+
+  node.classList.toggle(
+    "success-state",
+    !isError
   );
 
 }
@@ -947,8 +1064,7 @@ function submitOrder(event) {
 
 
   /*
-   * Prevent second submission while
-   * first request is active.
+   * Prevent duplicate click while pending.
    */
   if (
     pendingOrderSubmission
@@ -960,7 +1076,7 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     FORM VALIDATION
+     VALIDATE
      ---------------------------------------------------------- */
 
   if (
@@ -973,12 +1089,12 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     CART VALIDATION
+     CART CHECK
      ---------------------------------------------------------- */
 
   if (
     typeof getCartQuantity !== "function" ||
-    getCartQuantity() === 0
+    getCartQuantity() <= 0
   ) {
 
     showFormMessage(
@@ -992,22 +1108,23 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     GOOGLE APPS SCRIPT URL
+     SCRIPT URL
      ---------------------------------------------------------- */
 
   const scriptUrl =
-    String(
-      CONFIG?.GOOGLE_SCRIPT_URL || ""
-    ).trim();
+    getConfigScriptUrl();
 
 
   /*
    * IMPORTANT:
    *
-   * Only reject when the URL is actually
-   * empty, placeholder, or malformed.
+   * This checks only:
    *
-   * Do NOT compare against the real URL.
+   * - empty URL
+   * - placeholder
+   * - malformed URL
+   *
+   * It does NOT reject the real URL.
    */
   if (
     !isValidScriptUrl(
@@ -1026,7 +1143,7 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     REQUIRED DOM ELEMENTS
+     ELEMENTS
      ---------------------------------------------------------- */
 
   const form =
@@ -1054,7 +1171,7 @@ function submitOrder(event) {
   ) {
 
     showFormMessage(
-      "The order form is not available. Please refresh the page and try again.",
+      "Order form is not available. Please refresh the page.",
       true
     );
 
@@ -1064,7 +1181,7 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     BUILD DATA
+     BUILD ORDER
      ---------------------------------------------------------- */
 
   const orderData =
@@ -1088,29 +1205,24 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     SAVE PENDING STATE
+     PENDING REQUEST
      ---------------------------------------------------------- */
 
   pendingOrderSubmission = {
 
     token:
-
       token,
 
     subtotal:
-
       subtotal,
 
     deliveryCharge:
-
       deliveryCharge,
 
     timeoutId:
-
       null,
 
     originalButtonText:
-
       button.textContent ||
       "Submit order"
 
@@ -1118,7 +1230,7 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     DISABLE BUTTON
+     BUTTON
      ---------------------------------------------------------- */
 
   button.disabled =
@@ -1136,7 +1248,7 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     MARK ACTIVE REQUEST
+     IFRAME REQUEST MARKER
      ---------------------------------------------------------- */
 
   iframe.dataset.activeRequest =
@@ -1144,7 +1256,7 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     CREATE HIDDEN PAYLOAD INPUT
+     PAYLOAD INPUT
      ---------------------------------------------------------- */
 
   const payloadInput =
@@ -1168,7 +1280,7 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     PRESERVE FORM ATTRIBUTES
+     SAVE FORM ATTRIBUTES
      ---------------------------------------------------------- */
 
   const originalAction =
@@ -1190,7 +1302,7 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     SUBMIT
+     SUBMIT TO IFRAME
      ---------------------------------------------------------- */
 
   form.appendChild(
@@ -1211,7 +1323,7 @@ function submitOrder(event) {
 
 
   /*
-   * Native form submission.
+   * Native browser submission.
    */
   form.submit();
 
@@ -1280,13 +1392,32 @@ function submitOrder(event) {
 
 
   /* ----------------------------------------------------------
-     RESPONSE TIMEOUT
+     TIMEOUT
      ---------------------------------------------------------- */
 
-  const timeoutMs =
-    Number(
-      CONFIG?.ORDER_TIMEOUT_MS || 30000
-    );
+  let timeoutMs =
+    30000;
+
+
+  if (
+    typeof CONFIG !== "undefined" &&
+    CONFIG &&
+    Number.isFinite(
+      Number(
+        CONFIG.ORDER_TIMEOUT_MS
+      )
+    )
+  ) {
+
+    timeoutMs =
+      Math.max(
+        5000,
+        Number(
+          CONFIG.ORDER_TIMEOUT_MS
+        )
+      );
+
+  }
 
 
   pendingOrderSubmission.timeoutId =
@@ -1295,7 +1426,8 @@ function submitOrder(event) {
 
         if (
           !pendingOrderSubmission ||
-          pendingOrderSubmission.token !== token
+          pendingOrderSubmission.token !==
+            token
         ) {
 
           return;
@@ -1305,6 +1437,9 @@ function submitOrder(event) {
 
         pendingOrderSubmission =
           null;
+
+
+        delete iframe.dataset.activeRequest;
 
 
         button.disabled =
@@ -1317,68 +1452,29 @@ function submitOrder(event) {
 
         showFormMessage(
 
-          "We could not confirm the order response. Please check your connection and try again. If you already received an Order ID, do not submit again.",
+          "We could not confirm the order response. Please check your connection. If you already received an Order ID, do not submit the order again.",
 
           true
 
         );
 
       },
+
       timeoutMs
+
     );
 
 }
 
 
 /* ============================================================
-   FORM MESSAGE
-   ============================================================ */
-
-function showFormMessage(
-  message,
-  isError = false
-) {
-
-  const node =
-    document.getElementById(
-      "formMessage"
-    );
-
-
-  if (!node) {
-    return;
-  }
-
-
-  node.textContent =
-    message;
-
-
-  node.classList.toggle(
-    "error-state",
-    isError
-  );
-
-
-  node.classList.toggle(
-    "success-state",
-    !isError
-  );
-
-}
-
-
-/* ============================================================
-   HANDLE APPS SCRIPT RESULT
+   HANDLE ORDER RESULT
    ============================================================ */
 
 function handleOrderResult(
   result
 ) {
 
-  /*
-   * Verify message type.
-   */
   if (
     !result ||
     result.type !==
@@ -1391,8 +1487,7 @@ function handleOrderResult(
 
 
   /*
-   * A response without an active submission
-   * should be ignored.
+   * There must be an active request.
    */
   if (
     !pendingOrderSubmission
@@ -1404,8 +1499,7 @@ function handleOrderResult(
 
 
   /*
-   * Only accept the response belonging
-   * to this exact browser request.
+   * Must match exact request ID.
    */
   if (
     result.clientRequestId !==
@@ -1431,7 +1525,7 @@ function handleOrderResult(
 
 
   /*
-   * Clear iframe request marker.
+   * Remove active request marker.
    */
   const iframe =
     document.getElementById(
@@ -1446,9 +1540,10 @@ function handleOrderResult(
   }
 
 
-  /*
-   * Restore button.
-   */
+  /* ----------------------------------------------------------
+     RESTORE BUTTON
+     ---------------------------------------------------------- */
+
   const button =
     document.getElementById(
       "submitOrderBtn"
@@ -1469,7 +1564,7 @@ function handleOrderResult(
 
 
   /* ----------------------------------------------------------
-     FAILURE
+     SERVER ERROR
      ---------------------------------------------------------- */
 
   if (
@@ -1511,7 +1606,7 @@ function handleOrderResult(
 
 
 /* ============================================================
-   SUCCESS SCREEN
+   ORDER SUCCESS
    ============================================================ */
 
 function showOrderSuccess(
@@ -1531,39 +1626,49 @@ function showOrderSuccess(
 
   const orderId =
     String(
-      result.orderId || "—"
+      result.orderId ||
+      "—"
     );
 
 
   const subtotal =
     Number(
-      result.subtotal || 0
+      result.subtotal ||
+      0
     );
 
 
   const deliveryCharge =
     Number(
-      result.deliveryCharge || 0
+      result.deliveryCharge ||
+      0
     );
 
 
   const total =
     Number(
-      result.total || 0
+      result.total ||
+      0
     );
 
 
   const safeOrderId =
     typeof escapeHtml === "function"
-      ? escapeHtml(orderId)
+      ? escapeHtml(
+          orderId
+        )
       : orderId;
 
 
-  const formatMoney =
-    amount =>
-      typeof formatBDT === "function"
-        ? formatBDT(amount)
-        : `৳${amount.toLocaleString()}`;
+  function money(
+    amount
+  ) {
+
+    return typeof formatBDT === "function"
+      ? formatBDT(amount)
+      : `৳${amount.toLocaleString("en-BD")}`;
+
+  }
 
 
   content.innerHTML = `
@@ -1600,6 +1705,7 @@ function showOrderSuccess(
           Order ID
         </span>
 
+
         <strong>
           ${safeOrderId}
         </strong>
@@ -1610,35 +1716,41 @@ function showOrderSuccess(
       <div class="success-summary">
 
         <div>
+
           <span>
             Products
           </span>
 
           <strong>
-            ${formatMoney(subtotal)}
+            ${money(subtotal)}
           </strong>
+
         </div>
 
 
         <div>
+
           <span>
             Delivery
           </span>
 
           <strong>
-            ${formatMoney(deliveryCharge)}
+            ${money(deliveryCharge)}
           </strong>
+
         </div>
 
 
         <div>
+
           <span>
             Total
           </span>
 
           <strong>
-            ${formatMoney(total)}
+            ${money(total)}
           </strong>
+
         </div>
 
       </div>
@@ -1687,9 +1799,6 @@ function showOrderSuccess(
         );
 
 
-        /*
-         * Go back to product shop.
-         */
         window.location.href =
           "index.html#shop";
 
@@ -1700,38 +1809,7 @@ function showOrderSuccess(
 
 
 /* ============================================================
-   REBUILD ORDER FORM
-   ============================================================ */
-
-function resetOrderContent() {
-
-  const content =
-    document.getElementById(
-      "orderContent"
-    );
-
-
-  if (!content) {
-    return;
-  }
-
-
-  content.innerHTML =
-    createOrderFormMarkup();
-
-
-  bindOrderFormEvents();
-
-
-  renderOrderSummary();
-
-  updateDeliverySummary();
-
-}
-
-
-/* ============================================================
-   ORDER FORM HTML
+   CREATE ORDER FORM MARKUP
    ============================================================ */
 
 function createOrderFormMarkup() {
@@ -1759,8 +1837,6 @@ function createOrderFormMarkup() {
       novalidate
     >
 
-      <!-- NAME -->
-
       <div class="field">
 
         <label for="customerName">
@@ -1786,8 +1862,6 @@ function createOrderFormMarkup() {
 
       </div>
 
-
-      <!-- PHONE -->
 
       <div class="field">
 
@@ -1816,8 +1890,6 @@ function createOrderFormMarkup() {
 
       </div>
 
-
-      <!-- DELIVERY AREA -->
 
       <div class="field">
 
@@ -1887,8 +1959,6 @@ function createOrderFormMarkup() {
       </div>
 
 
-      <!-- ADDRESS -->
-
       <div class="field">
 
         <label for="address">
@@ -1915,8 +1985,6 @@ function createOrderFormMarkup() {
       </div>
 
 
-      <!-- NOTE -->
-
       <div class="field">
 
         <label for="note">
@@ -1940,8 +2008,6 @@ function createOrderFormMarkup() {
       </div>
 
 
-      <!-- SUBMIT -->
-
       <button
         class="button button-dark full"
         id="submitOrderBtn"
@@ -1958,7 +2024,6 @@ function createOrderFormMarkup() {
         aria-live="polite"
       ></p>
 
-
     </form>
 
   `;
@@ -1967,7 +2032,37 @@ function createOrderFormMarkup() {
 
 
 /* ============================================================
-   BIND ORDER FORM EVENTS
+   RESET ORDER CONTENT
+   ============================================================ */
+
+function resetOrderContent() {
+
+  const content =
+    document.getElementById(
+      "orderContent"
+    );
+
+
+  if (!content) {
+    return;
+  }
+
+
+  content.innerHTML =
+    createOrderFormMarkup();
+
+
+  bindOrderFormEvents();
+
+  renderOrderSummary();
+
+  updateDeliverySummary();
+
+}
+
+
+/* ============================================================
+   BIND EVENTS
    ============================================================ */
 
 function bindOrderFormEvents() {
@@ -1979,11 +2074,12 @@ function bindOrderFormEvents() {
 
 
   /*
-   * Avoid duplicate form submit listeners.
+   * Prevent duplicate listeners.
    */
   if (
     form &&
-    form.dataset.orderBound !== "true"
+    form.dataset.orderBound !==
+      "true"
   ) {
 
     form.addEventListener(
@@ -1999,55 +2095,58 @@ function bindOrderFormEvents() {
 
 
   /*
-   * Delivery radio buttons.
+   * Delivery radios.
    */
   document
     .querySelectorAll(
       'input[name="deliveryArea"]'
     )
-    .forEach(input => {
+    .forEach(
+      input => {
 
-      if (
-        input.dataset.deliveryBound ===
-        "true"
-      ) {
+        if (
+          input.dataset.deliveryBound ===
+          "true"
+        ) {
 
-        return;
-
-      }
-
-
-      input.addEventListener(
-        "change",
-        () => {
-
-          updateDeliverySummary();
-
-
-          const error =
-            document.getElementById(
-              "deliveryAreaError"
-            );
-
-
-          if (error) {
-
-            error.textContent = "";
-
-          }
+          return;
 
         }
-      );
 
 
-      input.dataset.deliveryBound =
-        "true";
+        input.addEventListener(
+          "change",
+          () => {
 
-    });
+            updateDeliverySummary();
+
+
+            const error =
+              document.getElementById(
+                "deliveryAreaError"
+              );
+
+
+            if (error) {
+
+              error.textContent =
+                "";
+
+            }
+
+          }
+        );
+
+
+        input.dataset.deliveryBound =
+          "true";
+
+      }
+    );
 
 
   /*
-   * Clear errors while typing.
+   * Clear field errors.
    */
   [
     [
@@ -2067,7 +2166,9 @@ function bindOrderFormEvents() {
     ([id, errorId]) => {
 
       const field =
-        document.getElementById(id);
+        document.getElementById(
+          id
+        );
 
 
       if (
@@ -2104,7 +2205,7 @@ function bindOrderFormEvents() {
 
 
 /* ============================================================
-   ENSURE FORM EXISTS
+   ENSURE ORDER FORM
    ============================================================ */
 
 function ensureOrderForm() {
@@ -2130,7 +2231,7 @@ function ensureOrderForm() {
 
 
 /* ============================================================
-   MESSAGE EVENT
+   MESSAGE FROM APPS SCRIPT IFRAME
    ============================================================ */
 
 window.addEventListener(
@@ -2138,16 +2239,70 @@ window.addEventListener(
   event => {
 
     /*
-     * Security:
+     * The message is coming FROM the Apps Script iframe.
      *
-     * Only accept messages from our GitHub Pages origin.
+     * Therefore event.origin is NOT the GitHub Pages origin.
      *
-     * Apps Script iframe sends this result back to
-     * the parent GitHub Pages document.
+     * We validate the sender using:
+     *
+     * 1. Expected Google origin
+     * 2. Actual iframe window
+     * 3. Message type
+     * 4. Matching clientRequestId
+     */
+
+
+    const iframe =
+      document.getElementById(
+        "orderSubmitFrame"
+      );
+
+
+    /*
+     * If iframe doesn't exist,
+     * ignore message.
      */
     if (
-      event.origin !==
-      "https://mdparvezmussaruf.github.io"
+      !iframe ||
+      !iframe.contentWindow
+    ) {
+
+      return;
+
+    }
+
+
+    /*
+     * Message must come from our
+     * order-submit iframe.
+     */
+    if (
+      event.source !==
+      iframe.contentWindow
+    ) {
+
+      return;
+
+    }
+
+
+    /*
+     * Apps Script responses can involve
+     * Google script/googleusercontent origins.
+     */
+    const allowedOrigins = [
+
+      "https://script.google.com",
+
+      "https://script.googleusercontent.com"
+
+    ];
+
+
+    if (
+      !allowedOrigins.includes(
+        event.origin
+      )
     ) {
 
       return;
