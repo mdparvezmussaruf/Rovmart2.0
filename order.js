@@ -916,7 +916,7 @@ function isValidScriptUrl(
    */
   if (
     url.includes(
-      "https://script.google.com/macros/s/AKfycbwnsVrgr8QMmOjG-PF84KgxpUxUm-oBewOojJLKWDsG6InOyjcClAL30gezh0Eo6rmT6w/exec"
+      "https://script.google.com/macros/s/AKfycbzLdMDNv5qomFUZk9dFYvlSY8094VgXBj9IDOynlYecyTpyixa5htvVutqTziuOdPre_A/exec"
     )
   ) {
 
