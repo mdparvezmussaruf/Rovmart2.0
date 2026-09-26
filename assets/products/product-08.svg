@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 1000" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dcd6cb"/>
+      <stop offset="1" stop-color="#857f73"/>
+    </linearGradient>
+    <linearGradient id="fabric" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2b2b28"/>
+      <stop offset="1" stop-color="#121210"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="1000" fill="url(#g)"/>
+  <circle cx="620" cy="170" r="180" fill="#f4f0e7" opacity=".46"/>
+  <path d="M125 1000C168 745 260 552 330 457c34-46 103-81 170-80 61 0 124 29 162 73 93 107 148 316 180 550z" fill="#1d1d1a" opacity=".13"/>
+  <path d="M242 415l87-66c28-22 53-30 74-30s46 8 74 30l87 66-47 96-61-38v421H306V473l-61 38z" fill="url(#fabric)"/>
+  <path d="M404 323c-20 34-33 71-37 112h66c-5-41-17-78-29-112z" fill="#3b3933" opacity=".8"/>
+  <path d="M230 456l-36 100 72 56 42-87zM570 456l36 100-72 56-42-87z" fill="#292824"/>
+  <text x="46" y="938" font-family="Arial,Helvetica,sans-serif" font-size="24" letter-spacing="6" fill="#f5f1e8">ROVMART / 08</text>
+</svg>

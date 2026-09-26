@@ -1,0 +1,12 @@
+{
+  "name": "ROVMART Fashion Store",
+  "short_name": "ROVMART",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f4f2ed",
+  "theme_color": "#141412",
+  "description": "ROVMART — modern fashion essentials.",
+  "icons": [
+    {"src":"assets/favicon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}
+  ]
+}

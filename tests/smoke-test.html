@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>ROVMART Smoke Test</title>
+  <style>body{font:16px system-ui;padding:24px;background:#f4f2ed}#out{white-space:pre-wrap;font-family:ui-monospace,monospace}.pass{color:#17663f}.fail{color:#9a3c34}</style>
+</head>
+<body>
+  <h1>ROVMART smoke test</h1>
+  <div id="out">Running…</div>
+
+  <button id="menuToggle" hidden></button>
+  <button id="closeMenuBtn" hidden></button>
+  <div id="categoryOverlay" class="hidden"></div>
+  <aside id="categoryMenu" class="hidden"></aside>
+  <div id="categoryList"></div>
+  <div id="shop"></div>
+  <input id="productSearch" placeholder="Search">
+  <button id="clearSearchBtn"></button>
+  <span id="searchMeta"></span>
+  <span id="productCount"></span>
+  <div id="productGrid"></div>
+  <button id="cartLink"></button>
+  <span id="headerCartCount"></span>
+  <div id="floatingCart" class="hidden"><span id="floatingQuantity"></span><span id="floatingTotal"></span><button id="confirmOrderBtn"></button></div>
+  <div id="cartDrawer" class="hidden"><button id="closeCartBtn"></button><div id="cartItems"></div><span id="drawerTotal"></span><button id="drawerConfirmBtn"></button></div>
+  <div id="orderModal" class="hidden"><button id="closeOrderBtn"></button><div id="orderContent"><div id="orderSummary"></div><form id="orderForm"><input id="customerName"><input id="phone"><textarea id="address"></textarea><textarea id="note"></textarea><input type="radio" name="deliveryArea" value="inside"><input type="radio" name="deliveryArea" value="outside"><small id="customerNameError"></small><small id="phoneError"></small><small id="addressError"></small><small id="deliveryAreaError"></small><button id="submitOrderBtn" type="submit"></button><p id="formMessage"></p></form></div></div>
+  <iframe id="orderSubmitFrame" name="orderSubmitFrame"></iframe>
+  <div id="cursorDot"></div>
+
+  <script src="../config.js"></script>
+  <script src="../products.js"></script>
+  <script src="../cart.js"></script>
+  <script src="../order.js"></script>
+  <script src="../app.js"></script>
+  <script>
+    setTimeout(() => {
+      const checks = [];
+      function check(name, condition) { checks.push({name, condition}); }
+      localStorage.removeItem("noire_fashion_cart");
+      cleanCart();
+      renderProductGrid("All products", "");
+      check("8 products render", document.querySelectorAll("#productGrid .product-card").length === 8);
+      check("8 categories including All products", getCategories().length === 8);
+      addToCart("P001", 2);
+      addToCart("P003", 1);
+      renderCartUI();
+      check("cart quantity is 3", getCartQuantity() === 3);
+      check("cart subtotal is ৳5070", getCartTotal() === 5070);
+      document.querySelector('[data-cart-plus="P001"]').click();
+      check("cart plus works", getCart().find(x => x.id === "P001").quantity === 3);
+      filterByCategory("T-Shirt");
+      check("category filter leaves one T-Shirt", document.querySelectorAll("#productGrid .product-card").length === 1);
+      const input = document.getElementById("customerName"); input.value = "Test Customer";
+      document.getElementById("phone").value = "01712345678";
+      document.getElementById("address").value = "Joydevpur, Gazipur, Bangladesh";
+      document.querySelector('input[name="deliveryArea"][value="inside"]').checked = true;
+      check("valid checkout form passes", validateOrderForm() === true);
+      clearCart();
+      const passed = checks.filter(x => x.condition).length;
+      const out = document.getElementById("out");
+      out.textContent = checks.map(x => `${x.condition ? "PASS" : "FAIL"} — ${x.name}`).join("\n") + `\n\n${passed}/${checks.length} checks passed`;
+      out.className = passed === checks.length ? "pass" : "fail";
+    }, 500);
+  </script>
+</body>
+</html>
