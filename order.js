@@ -173,7 +173,7 @@ function submitOrder(event) {
   }
 
   const scriptUrl = String(CONFIG.GOOGLE_SCRIPT_URL || "").trim();
-  if (!scriptUrl || scriptUrl.includes("PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE")) {
+  if (!scriptUrl || scriptUrl.includes("https://script.google.com/macros/s/AKfycbzW7RBoFfw6UkGT5WMoOBdLtJU63z-OwBTRG6jA9sreG9FlxV9245PUYK5wkdlFY8pcwQ/exec")) {
     showFormMessage("Add your Google Apps Script Web App URL in config.js before submitting.", true);
     return;
   }
