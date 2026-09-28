@@ -194,7 +194,7 @@ function renderProductDetail() {
     quantityNode.textContent = String(quantity);
   });
   document.getElementById("detailPlus")?.addEventListener("click", () => {
-    quantity = Math.min(MAX_QUANTITY, quantity + 1);
+    quantity = (Math.min(Number(CONFIG?.MAX_CART_QUANTITY) || MAX_QUANTITY, quantity + 1));
     quantityNode.textContent = String(quantity);
   });
   document.getElementById("detailAddBtn")?.addEventListener("click", () => addToCart(product.id, quantity));
