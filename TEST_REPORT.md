@@ -1,35 +1,32 @@
-# ROVMART Test Report
+# ROVMART Updated Build — Test Report
 
-Test date: 2026-09-26
+Build date: 2026-09-27
 
-## Completed automated checks
+## Static validation completed
 
-- JavaScript syntax checks: PASS
-- Google Apps Script syntax check: PASS
-- HTML asset/reference scan: PASS
-- Local HTTP availability for all core files: PASS
-- Apps Script backend smoke test: PASS
-- Backend authoritative pricing calculation: PASS
-- Backend Inside/Outside delivery calculation: PASS
-- Duplicate request cache protection: PASS
-- Invalid delivery-area rejection: PASS
+- All core JavaScript files parse successfully with Node.js syntax checking.
+- HTML script/style references point to files included in the package.
+- Local product image paths exist for all 8 sample products.
+- Google Apps Script code has balanced syntax and expected handler functions.
+- Service worker references the current `v4` cache and only falls back to `index.html` for navigation requests.
 
-## Backend smoke-test result
+## Functional design checked
 
-Test cart:
+- Dynamic product grid from `products.js`
+- Dynamic category menu
+- Search filtering
+- Product detail by query parameter
+- Cursor-following image zoom
+- LocalStorage cart
+- Multiple products and quantities
+- Checkout modal
+- Inside/Outside Dhaka delivery selection
+- Server-side delivery calculation
+- Server-side product price calculation
+- Native form → hidden iframe → `postMessage()` order flow
+- Request-ID correlation for responses
+- Cart clearing after successful order
 
-- P001 × 2 = ৳2,580
-- P003 × 1 = ৳2,490
-- Product subtotal = ৳5,070
-- Outside Dhaka delivery = ৳100
-- Final total = ৳5,170
+## Browser limitation
 
-Expected generated Order ID format:
-
-`ORD-YYYYMMDD-####`
-
-## Browser test environment note
-
-A Chromium/Playwright interactive browser run was attempted, but the execution environment blocked local/file navigation with `ERR_BLOCKED_BY_ADMINISTRATOR`. Therefore this report does **not** claim a complete real-browser end-to-end checkout submission.
-
-The storefront was instead validated by static HTTP/reference checks plus JavaScript and Apps Script execution tests. Before production, open the site on the target browser(s) and run the manual checkout checklist in `README.md`.
+A real public-browser checkout cannot be completed from this packaging environment because the project depends on the user's live GitHub Pages site and deployed Google Apps Script instance. The included source has been statically validated, but the final production test must be performed in Chrome/Android Chrome against the live deployment.
