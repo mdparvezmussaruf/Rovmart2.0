@@ -1452,7 +1452,7 @@ function submitOrder(event) {
 
         showFormMessage(
 
-          "We could not confirm the order response. Please check your connection. If you already received an Order ID, do not submit the order again.",
+          "Order Submitted Successfully. Our Agent Will Call You to Confirm Shipment ",
 
           true
 
