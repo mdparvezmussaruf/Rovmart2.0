@@ -1,6 +1,6 @@
 /* ROVMART cart state */
 const CART_KEY = "noire_fashion_cart";
-const MAX_QUANTITY = 99;
+const MAX_QUANTITY = Number(CONFIG?.MAX_CART_QUANTITY) || 99;
 
 function getCart() {
   try {
@@ -22,43 +22,53 @@ function saveCart(cart) {
   renderCartUI();
 }
 
+function normalizeQuantity(value) {
+  const parsed = Number.parseInt(value, 10);
+  return Number.isFinite(parsed) ? Math.min(MAX_QUANTITY, Math.max(1, parsed)) : 1;
+}
+
 function cleanCart() {
-  const validIds = new Set(products.map(product => product.id));
+  const validProducts = new Map(products.map(product => [product.id, product]));
+  const merged = new Map();
   const current = getCart();
-  const cleaned = [];
   let changed = false;
 
   for (const item of current) {
-    if (!item || !validIds.has(item.id)) {
+    const product = item && validProducts.get(item.id);
+    if (!product || !product.available) {
       changed = true;
       continue;
     }
-    const quantity = Number.parseInt(item.quantity, 10);
-    const safeQuantity = Number.isFinite(quantity) ? Math.min(MAX_QUANTITY, Math.max(1, quantity)) : 1;
-    if (safeQuantity !== quantity) changed = true;
-    cleaned.push({ id: item.id, quantity: safeQuantity });
+
+    const quantity = normalizeQuantity(item.quantity);
+    const previous = merged.get(item.id) || 0;
+    const total = Math.min(MAX_QUANTITY, previous + quantity);
+
+    if (merged.has(item.id) || item.quantity !== quantity) changed = true;
+    merged.set(item.id, total);
   }
 
-  if (changed || cleaned.length !== current.length) {
-    saveCart(cleaned);
-  }
+  const cleaned = [...merged.entries()].map(([id, quantity]) => ({ id, quantity }));
+  if (cleaned.length !== current.length) changed = true;
+
+  if (changed) saveCart(cleaned);
   return cleaned;
 }
 
 function addToCart(productId, quantity = 1) {
+  cleanCart();
   const product = products.find(item => item.id === productId && item.available);
   if (!product) {
     showToast("That product is unavailable.");
     return false;
   }
 
-  const parsed = Number.parseInt(quantity, 10);
-  const amount = Number.isFinite(parsed) ? Math.min(MAX_QUANTITY, Math.max(1, parsed)) : 1;
+  const amount = normalizeQuantity(quantity);
   const cart = getCart();
   const existing = cart.find(item => item.id === productId);
 
   if (existing) {
-    existing.quantity = Math.min(MAX_QUANTITY, existing.quantity + amount);
+    existing.quantity = Math.min(MAX_QUANTITY, normalizeQuantity(existing.quantity) + amount);
   } else {
     cart.push({ id: productId, quantity: amount });
   }
@@ -93,9 +103,9 @@ function removeFromCart(productId) {
 function getDetailedCart() {
   return getCart()
     .map(item => {
-      const product = products.find(entry => entry.id === item.id);
+      const product = products.find(entry => entry.id === item.id && entry.available);
       if (!product) return null;
-      const quantity = Math.min(MAX_QUANTITY, Math.max(1, Number(item.quantity) || 1));
+      const quantity = normalizeQuantity(item.quantity);
       return {
         ...product,
         quantity,
@@ -106,7 +116,7 @@ function getDetailedCart() {
 }
 
 function getCartQuantity() {
-  return getCart().reduce((total, item) => total + (Number(item.quantity) || 0), 0);
+  return getDetailedCart().reduce((total, item) => total + item.quantity, 0);
 }
 
 function getCartTotal() {
@@ -119,7 +129,8 @@ function clearCart() {
 
 function formatBDT(value) {
   const amount = Number(value) || 0;
-  return `৳${amount.toLocaleString("en-BD")}`;
+  const symbol = typeof CONFIG !== "undefined" && CONFIG.CURRENCY_SYMBOL ? CONFIG.CURRENCY_SYMBOL : "৳";
+  return `${symbol}${amount.toLocaleString("en-BD")}`;
 }
 
 function renderCartUI() {
