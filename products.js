@@ -38,7 +38,7 @@ const products = [
     description: "A structured denim layer designed to work across seasons.",
     details: ["Mid-weight denim", "Regular fit", "Metal buttons", "Two chest pockets"],
     available: true
-  },
+  }, 
   {
     id: "P004",
     name: "Minimal Cargo Trouser",
