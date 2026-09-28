@@ -400,3 +400,4 @@ function jsonResponse_(object) {
     .createTextOutput(JSON.stringify(object))
     .setMimeType(ContentService.MimeType.JSON);
 }
+
