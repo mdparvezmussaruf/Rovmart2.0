@@ -8,7 +8,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20260927">
   <title>ROVMART — Fashion Store</title>
 </head>
 <body>
@@ -18,11 +18,12 @@
     </button>
     <a class="brand" href="index.html" aria-label="ROVMART home">ROVMART<span>.</span></a>
     <div class="header-actions">
-      <label class="search-box" for="productSearch">
+      <div class="search-box">
+        <label class="sr-only" for="productSearch">Search products</label>
         <span aria-hidden="true">⌕</span>
         <input id="productSearch" type="search" placeholder="Search pieces" autocomplete="off">
         <button id="clearSearchBtn" type="button" aria-label="Clear search">×</button>
-      </label>
+      </div>
       <button class="cart-link" id="cartLink" type="button" aria-label="Open cart">
         Cart <span id="headerCartCount">0</span>
       </button>
@@ -177,10 +178,10 @@
   <iframe name="orderSubmitFrame" id="orderSubmitFrame" title="Order submission" class="order-submit-frame" aria-hidden="true"></iframe>
   <div id="cursorDot" class="cursor-dot" aria-hidden="true"></div>
 
-  <script src="config.js"></script>
-  <script src="products.js"></script>
-  <script src="cart.js"></script>
-  <script src="order.js"></script>
-  <script src="app.js"></script>
+  <script src="config.js?v=20260927"></script>
+  <script src="products.js?v=20260927"></script>
+  <script src="cart.js?v=20260927"></script>
+  <script src="order.js?v=20260927"></script>
+  <script src="app.js?v=20260927"></script>
 </body>
 </html>
