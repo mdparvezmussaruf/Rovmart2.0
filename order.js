@@ -79,7 +79,7 @@ function isValidScriptUrl(url) {
    */
   if (
     url.includes(
-      "https://script.google.com/macros/s/AKfycbzTMyuIddg7-jdp-Fb0U-w3kPS6BYc1v3nT30mo4siAxe-65Z1VY9c6TxsKgtPqE03wgA/exec"
+      "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE"
     )
   ) {
     return false;
@@ -2290,23 +2290,22 @@ window.addEventListener(
      * Apps Script responses can involve
      * Google script/googleusercontent origins.
      */
-    const allowedOrigins = [
+    let originAllowed = false;
 
-      "https://script.google.com",
+    try {
+      const origin = new URL(event.origin);
+      const host = origin.hostname;
+      originAllowed =
+        origin.protocol === "https:" &&
+        (host === "script.google.com" ||
+         host === "script.googleusercontent.com" ||
+         host.endsWith(".googleusercontent.com"));
+    } catch (_) {
+      originAllowed = false;
+    }
 
-      "https://script.googleusercontent.com"
-
-    ];
-
-
-    if (
-      !allowedOrigins.includes(
-        event.origin
-      )
-    ) {
-
+    if (!originAllowed) {
       return;
-
     }
 
 
