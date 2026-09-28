@@ -79,7 +79,7 @@ function isValidScriptUrl(url) {
    */
   if (
     url.includes(
-      "https://script.google.com/macros/s/AKfycbzLdMDNv5qomFUZk9dFYvlSY8094VgXBj9IDOynlYecyTpyixa5htvVutqTziuOdPre_A/exec"
+      "PASTE_YOUR_APPS_SCRIPT_EXEC_URL_HERE"
     )
   ) {
     return false;
